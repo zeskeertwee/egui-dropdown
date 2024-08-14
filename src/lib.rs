@@ -2,10 +2,7 @@
 
 #![warn(missing_docs)]
 
-use egui::{
-    text::{CCursor, CCursorRange},
-    Id, Response, TextEdit, Ui, Widget, WidgetText,
-};
+use egui::{text::{CCursor, CCursorRange}, Id, Key, Response, TextEdit, Ui, Widget, WidgetText};
 use std::hash::Hash;
 
 /// Dropdown widget
@@ -23,6 +20,7 @@ pub struct DropDownBox<
     filter_by_input: bool,
     select_on_focus: bool,
     desired_width: Option<f32>,
+    max_items: usize,
 }
 
 impl<'a, F: FnMut(&mut Ui, &str) -> Response, V: AsRef<str>, I: Iterator<Item = V>>
@@ -34,6 +32,7 @@ impl<'a, F: FnMut(&mut Ui, &str) -> Response, V: AsRef<str>, I: Iterator<Item = 
         id_source: impl Hash,
         buf: &'a mut String,
         display: F,
+        max_items: usize
     ) -> Self {
         Self {
             popup_id: Id::new(id_source),
@@ -44,6 +43,7 @@ impl<'a, F: FnMut(&mut Ui, &str) -> Response, V: AsRef<str>, I: Iterator<Item = 
             filter_by_input: true,
             select_on_focus: false,
             desired_width: None,
+            max_items
         }
     }
 
@@ -85,6 +85,7 @@ impl<'a, F: FnMut(&mut Ui, &str) -> Response, V: AsRef<str>, I: Iterator<Item = 
             filter_by_input,
             select_on_focus,
             desired_width,
+            max_items
         } = self;
 
         let mut edit = TextEdit::singleline(buf).hint_text(hint_text);
@@ -97,8 +98,7 @@ impl<'a, F: FnMut(&mut Ui, &str) -> Response, V: AsRef<str>, I: Iterator<Item = 
             if select_on_focus {
                 edit_output
                     .state
-                    .cursor
-                    .set_char_range(Some(CCursorRange::two(
+                    .set_ccursor_range(Some(CCursorRange::two(
                         CCursor::new(0),
                         CCursor::new(buf.len()),
                     )));
@@ -112,24 +112,27 @@ impl<'a, F: FnMut(&mut Ui, &str) -> Response, V: AsRef<str>, I: Iterator<Item = 
             ui,
             popup_id,
             &r,
-            egui::PopupCloseBehavior::CloseOnClick,
             |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    for var in it {
+                    let buf_text = buf.to_lowercase();
+                    let empty_buf = buf.is_empty();
+                    let iter: Vec<_> = it.into_iter()
+                        .filter(|v| empty_buf || (!empty_buf && v.as_ref().to_lowercase().starts_with(&buf_text))).take(max_items)
+                        .collect();
+                    for var in &iter {
                         let text = var.as_ref();
-                        if filter_by_input
-                            && !buf.is_empty()
-                            && !text.to_lowercase().contains(&buf.to_lowercase())
-                        {
-                            continue;
-                        }
-
                         if display(ui, text).clicked() {
-                            *buf = text.to_owned();
+                            *buf = text.to_string().to_string();
                             changed = true;
 
                             ui.memory_mut(|m| m.close_popup());
                         }
+                    }
+
+                    if iter.len() == 1 && ui.input(|i| i.key_pressed(Key::Enter)) {
+                        *buf = iter[0].as_ref().to_string();
+                        changed = true;
+                        ui.memory_mut(|m| m.close_popup());
                     }
                 });
             },

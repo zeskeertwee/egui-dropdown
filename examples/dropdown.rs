@@ -1,5 +1,5 @@
 use eframe::{App, Frame, NativeOptions};
-use egui::Context;
+use egui::{Context, Key};
 use egui_dropdown::DropDownBox;
 
 struct ExampleApp {
@@ -17,6 +17,7 @@ impl App for ExampleApp {
                         "test_dropbox",
                         &mut self.buf,
                         |ui, text| ui.selectable_label(false, text),
+                        5
                     )
                     // choose whether to filter the box items based on what is in the text edit already
                     // default is true when this is not used
@@ -26,11 +27,11 @@ impl App for ExampleApp {
                     .select_on_focus(true)
                     // passes through the desired width to the text edit
                     // default is None internally, so TextEdit does whatever its default implements
-                    .desired_width(250.0),
+                    .desired_width(250.0).hint_text("Search items")
                 );
 
-                if ui.button("Add").clicked() {
-                    self.items.push(self.buf.clone());
+                if ui.button("Add").clicked() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                    println!("Added '{}'", self.buf);
                 }
             });
         });
@@ -42,15 +43,18 @@ fn main() {
         "egui-dropdown",
         NativeOptions::default(),
         Box::new(|_| {
-            Ok(Box::new(ExampleApp {
+            Box::new(ExampleApp {
                 items: vec![
                     "First".into(),
                     "Second".into(),
                     "Third".into(),
                     "Other".into(),
+                    "Another".into(),
+                    "One more".into(),
+                    "Just one more".into()
                 ],
                 buf: String::new(),
-            }))
+            })
         }),
     )
     .unwrap();
